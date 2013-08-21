@@ -1,19 +1,19 @@
 #include "CircleTracking.h"
 
-CLEyeCameraCapture::CLEyeCameraCapture()
-{
-	pCapBuffer = NULL;
-}
-
 CLEyeCameraCapture::CLEyeCameraCapture(LPSTR windowName, GUID cameraGUID, CLEyeCameraColorMode mode, CLEyeCameraResolution resolution, float fps) :
 _cameraGUID(cameraGUID), _cam(NULL), _mode(mode), _resolution(resolution), _fps(fps), _running(false)
 {
 	strcpy(_windowName, windowName);
+	pCapBuffer = NULL;
+	counter = 0;
+	flag = false;
+	trackingWindowName = "TrackingWindow";
 }
 bool CLEyeCameraCapture::StartCapture()
 {
 	_running = true;
-	namedWindow(_windowName, CV_WINDOW_AUTOSIZE);
+	namedWindow(_windowName, 0);
+	namedWindow(trackingWindowName, CV_WINDOW_AUTOSIZE);
 	// Start CLEye image capture thread
 	_hThread = CreateThread(NULL, 0, &CLEyeCameraCapture::CaptureThread, this, 0, 0);
 	if(_hThread == NULL)
@@ -57,10 +57,10 @@ void CLEyeCameraCapture::Run()
 		pCapImage = cvCreateImage(cvSize(w, h), IPL_DEPTH_8U, 1);
 	
 	// Set some camera parameters
-	CLEyeSetCameraParameter(_cam, CLEYE_GAIN, 20);
-	CLEyeSetCameraParameter(_cam, CLEYE_EXPOSURE, 511);
-	//CLEyeSetCameraParameter(_cam, CLEYE_AUTO_GAIN, true);
-	//CLEyeSetCameraParameter(_cam, CLEYE_AUTO_EXPOSURE, true);
+	//CLEyeSetCameraParameter(_cam, CLEYE_GAIN, 20);
+	//CLEyeSetCameraParameter(_cam, CLEYE_EXPOSURE, 511);
+	CLEyeSetCameraParameter(_cam, CLEYE_AUTO_GAIN, true);
+	CLEyeSetCameraParameter(_cam, CLEYE_AUTO_EXPOSURE, true);
 	
 	// Start capturing
 	CLEyeCameraStart(_cam);
@@ -71,19 +71,97 @@ void CLEyeCameraCapture::Run()
 	long prevCount = 0;
 	double fps = 0;
 	// image capturing loop
+	///////
+	Mat src_gray, temp;
+	
+	vector<Vec3f> circles;
+	Point center;
+	Point n_center;
+	int radius = 0;
+	bool _hasCircles = false;
+	
+	///////
 	while(_running)
 	{
+		CLEyeCameraGetFrame(_cam, pCapBuffer);
 		//check fps every 100 frames
 		frames++;
+		
 		if((frames % 100) == 0){
 			prevCount = count;
 			count = GetTickCount();
 			fps = 100000.0/(count - prevCount);
-			cout << "fps: " << fps << endl;
+			std::cout << "fps: " << fps << endl;
+			//cout << "center: " << center.x << "  " << center.y << "  " << radius << endl;
+			//cout << "circles: " << circles.size() << endl;
 		}
-		CLEyeCameraGetFrame(_cam, pCapBuffer);
-		imshow(_windowName, pCapture);
+	
+		///////////////////
+		if(!_hasCircles){
+			cvtColor(pCapture, src_gray, CV_BGR2GRAY);
+			GaussianBlur(src_gray, src_gray, Size(9, 9), 2, 2);
+			HoughCircles(src_gray, circles, CV_HOUGH_GRADIENT, 1, src_gray.rows, 150, 40, 0, 0);
+			for(size_t i = 0; i < circles.size(); i++)
+			{
+				center.x = cvRound(circles[i][0]);
+				center.y = cvRound(circles[i][1]);
+				radius = cvRound(circles[i][2]);
+				circle(pCapture, center, 3, Scalar(0, 255, 0), -1, 8, 0);
+				circle(pCapture, center, radius, Scalar(0, 0, 255), 3, 8, 0);
+			}
+			if(circles.size() != 0)
+				_hasCircles = true;
+			n_center = center;
+			imshow(_windowName, pCapture);
+		}
+		
+		else
+		{
+			int x, y;
+			
+			x = n_center.x - 30;
+			y = n_center.y - 30;
+
+			Rect t_rect(x, y, 60, 60);
+			//cout << center.x << "  " << center.y << endl;
+			temp = pCapture(t_rect);
+			cvtColor(temp, src_gray, CV_BGR2GRAY);
+			GaussianBlur(src_gray, src_gray, Size(3, 3), 2, 2);
+			HoughCircles(src_gray, circles, CV_HOUGH_GRADIENT, 2, src_gray.rows, 180, 10, 0, 0);
+			for(size_t i = 0; i < circles.size(); i++)
+			{
+				center.x = cvRound(circles[i][0]);
+				center.y = cvRound(circles[i][1]);
+				radius = cvRound(circles[i][2]);
+				circle(temp, center, 3, Scalar(0, 255, 0), -1, 8, 0);
+				circle(temp, center, radius, Scalar(0, 0, 255), 3, 8, 0);
+			}
+			imshow(trackingWindowName, temp);
+			if(circles.size() == 0)
+			{	
+				counter++;
+					
+				if(counter == 3)
+				{
+				//circles.clear();
+					_hasCircles = false;
+					counter = 0;
+				}
+				
+			}
+			else
+			{
+				counter =0;
+				n_center.x = x + center.x;
+				n_center.y = y + center.y;
+			}
+			
+		}
+		/////////////////////
 	}
+	
+	
+	//}
 	// Stop camera capture
 	CLEyeCameraStop(_cam);
 	// Destroy camera object
@@ -91,6 +169,11 @@ void CLEyeCameraCapture::Run()
 	// Destroy the allocated OpenCV image
 	cvReleaseImage(&pCapImage);
 	_cam = NULL;
+}
+
+Mat CLEyeCameraCapture::GetCaptureImage()
+{
+	return pCapture;
 }
 
 // Main program entry point
@@ -152,6 +235,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			pCam = cam[0];
 					}
 					if(pCam)	pCam->DecrementCameraParameter(param);		break;
+		case 'a': flag = true; break;
 		}
 	}
 	//delete cams

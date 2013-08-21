@@ -3,14 +3,20 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
+#include <math.h>
 
 #include "CLEyeMulticam.h"
 #include "opencv.hpp"
-#include <opencv\cv.h>
-#include <opencv\highgui.h>
+//#include <opencv\cv.h>
+//#include <opencv\highgui.h>
+#include <opencv2\highgui\highgui.hpp>
+#include <opencv2\imgproc\imgproc.hpp>
 
 using namespace cv;
 using namespace std;
+
+int counter;
+	bool flag;
 
 static LARGE_INTEGER _frequencyPT;
 
@@ -42,12 +48,14 @@ class CLEyeCameraCapture
 	CLEyeCameraInstance _cam;
 	CLEyeCameraColorMode _mode;
 	CLEyeCameraResolution _resolution;
+	char* trackingWindowName;
 	float _fps;
 	HANDLE _hThread;
 	bool _running;
 
 public:
-	CLEyeCameraCapture();
+
+	//CLEyeCameraCapture();
 	//~CLEyeCameraCapture();
 
 	CLEyeCameraCapture(LPSTR windowName, GUID cameraGUID, CLEyeCameraColorMode mode, CLEyeCameraResolution resolution, float fps);
@@ -61,6 +69,8 @@ public:
 	void DecrementCameraParameter(int param);
 	
 	void Run();
+
+	Mat GetCaptureImage();
 	
 	static DWORD WINAPI CaptureThread(LPVOID instance)
 	{
