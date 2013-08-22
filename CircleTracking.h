@@ -68,6 +68,8 @@ public:
 	
 	void Run();
 
+	void CircleDetector(Mat& input, Mat& input_gray, vector<Vec3f>& circles, Point& center, int& radius);
+
 	Point FixSubImageSize(Point center, int w, int h, int size);
 
 	Mat GetCaptureImage();
