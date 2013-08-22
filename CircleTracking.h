@@ -15,9 +15,6 @@
 using namespace cv;
 using namespace std;
 
-int counter;
-	bool flag;
-
 static LARGE_INTEGER _frequencyPT;
 
 static inline PVOID ProfileMSStart()
@@ -52,6 +49,7 @@ class CLEyeCameraCapture
 	float _fps;
 	HANDLE _hThread;
 	bool _running;
+	bool _isTracking;
 
 public:
 
@@ -69,6 +67,8 @@ public:
 	void DecrementCameraParameter(int param);
 	
 	void Run();
+
+	Point FixSubImageSize(Point center, int w, int h, int size);
 
 	Mat GetCaptureImage();
 	

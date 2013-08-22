@@ -5,15 +5,14 @@ _cameraGUID(cameraGUID), _cam(NULL), _mode(mode), _resolution(resolution), _fps(
 {
 	strcpy(_windowName, windowName);
 	pCapBuffer = NULL;
-	counter = 0;
-	flag = false;
+	bool _isTracking = false;
 	trackingWindowName = "TrackingWindow";
 }
 bool CLEyeCameraCapture::StartCapture()
 {
 	_running = true;
 	namedWindow(_windowName, 0);
-	namedWindow(trackingWindowName, CV_WINDOW_AUTOSIZE);
+	//namedWindow(trackingWindowName, CV_WINDOW_AUTOSIZE);
 	// Start CLEye image capture thread
 	_hThread = CreateThread(NULL, 0, &CLEyeCameraCapture::CaptureThread, this, 0, 0);
 	if(_hThread == NULL)
@@ -61,6 +60,7 @@ void CLEyeCameraCapture::Run()
 	//CLEyeSetCameraParameter(_cam, CLEYE_EXPOSURE, 511);
 	CLEyeSetCameraParameter(_cam, CLEYE_AUTO_GAIN, true);
 	CLEyeSetCameraParameter(_cam, CLEYE_AUTO_EXPOSURE, true);
+	CLEyeSetCameraParameter( _cam, CLEYE_HFLIP, true);
 	
 	// Start capturing
 	CLEyeCameraStart(_cam);
@@ -72,14 +72,13 @@ void CLEyeCameraCapture::Run()
 	double fps = 0;
 	// image capturing loop
 	///////
-	Mat src_gray, temp;
+	Mat src_gray, subImage, subImage_gray;
 	
 	vector<Vec3f> circles;
 	Point center;
 	Point n_center;
 	int radius = 0;
-	bool _hasCircles = false;
-	
+	int counter = 0;
 	///////
 	while(_running)
 	{
@@ -96,11 +95,11 @@ void CLEyeCameraCapture::Run()
 			//cout << "circles: " << circles.size() << endl;
 		}
 	
-		///////////////////
-		if(!_hasCircles){
+		//find circle in whole area of frame first
+		if(!_isTracking){
 			cvtColor(pCapture, src_gray, CV_BGR2GRAY);
 			GaussianBlur(src_gray, src_gray, Size(9, 9), 2, 2);
-			HoughCircles(src_gray, circles, CV_HOUGH_GRADIENT, 1, src_gray.rows, 150, 40, 0, 0);
+			HoughCircles(src_gray, circles, CV_HOUGH_GRADIENT, 2, src_gray.rows, 180, 10, 5, 20);
 			for(size_t i = 0; i < circles.size(); i++)
 			{
 				center.x = cvRound(circles[i][0]);
@@ -110,54 +109,52 @@ void CLEyeCameraCapture::Run()
 				circle(pCapture, center, radius, Scalar(0, 0, 255), 3, 8, 0);
 			}
 			if(circles.size() != 0)
-				_hasCircles = true;
+				_isTracking = true;
 			n_center = center;
-			imshow(_windowName, pCapture);
+			
 		}
-		
+		//dynamically move subimage area by tracking the object
 		else
 		{
-			int x, y;
+			int subImage_size = 30;
+			Point temp = FixSubImageSize(n_center, 320, 240, subImage_size);
 			
-			x = n_center.x - 30;
-			y = n_center.y - 30;
-
-			Rect t_rect(x, y, 60, 60);
+			Rect t_rect(temp.x - subImage_size, temp.y - subImage_size, subImage_size*2, subImage_size*2);
 			//cout << center.x << "  " << center.y << endl;
-			temp = pCapture(t_rect);
-			cvtColor(temp, src_gray, CV_BGR2GRAY);
-			GaussianBlur(src_gray, src_gray, Size(3, 3), 2, 2);
-			HoughCircles(src_gray, circles, CV_HOUGH_GRADIENT, 2, src_gray.rows, 180, 10, 0, 0);
+			subImage = pCapture(t_rect);
+			cvtColor(subImage, subImage_gray, CV_BGR2GRAY);
+			GaussianBlur(subImage_gray, subImage_gray, Size(3, 3), 2, 2);
+			HoughCircles(subImage_gray, circles, CV_HOUGH_GRADIENT, 2, subImage_gray.rows, 180, 10, 5, 20);
 			for(size_t i = 0; i < circles.size(); i++)
 			{
 				center.x = cvRound(circles[i][0]);
 				center.y = cvRound(circles[i][1]);
 				radius = cvRound(circles[i][2]);
-				circle(temp, center, 3, Scalar(0, 255, 0), -1, 8, 0);
-				circle(temp, center, radius, Scalar(0, 0, 255), 3, 8, 0);
+				circle(subImage, center, 3, Scalar(0, 255, 0), -1, 8, 0);
+				circle(subImage, center, radius, Scalar(0, 0, 255), 3, 8, 0);
 			}
-			imshow(trackingWindowName, temp);
+			//imshow(trackingWindowName, subImage);
 			if(circles.size() == 0)
 			{	
 				counter++;
 					
 				if(counter == 3)
 				{
-				//circles.clear();
-					_hasCircles = false;
+					_isTracking = false;
 					counter = 0;
+					cout << "test!!! " << endl;
 				}
 				
 			}
 			else
 			{
-				counter =0;
-				n_center.x = x + center.x;
-				n_center.y = y + center.y;
+				counter = 0;
+				n_center.x = temp.x - subImage_size + center.x;
+				n_center.y = temp.y - subImage_size + center.y;
 			}
 			
 		}
-		/////////////////////
+		imshow(_windowName, pCapture);
 	}
 	
 	
@@ -169,6 +166,15 @@ void CLEyeCameraCapture::Run()
 	// Destroy the allocated OpenCV image
 	cvReleaseImage(&pCapImage);
 	_cam = NULL;
+}
+
+Point CLEyeCameraCapture::FixSubImageSize(Point center, int w, int h, int size)
+{
+	center.x = center.x < size ? size : center.x;
+	center.x = center.x > w - size ? w - size : center.x;
+	center.y = center.y < size ? size : center.y;
+	center.y = center.y > h - size ? h - size : center.y;
+	return center;
 }
 
 Mat CLEyeCameraCapture::GetCaptureImage()
@@ -235,7 +241,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			pCam = cam[0];
 					}
 					if(pCam)	pCam->DecrementCameraParameter(param);		break;
-		case 'a': flag = true; break;
+		//case 'a': pCam._isTracking = false; break;
 		}
 	}
 	//delete cams
