@@ -53,14 +53,14 @@ void CLEyeCameraCapture::Run()
 		pCapImage = cvCreateImage(cvSize(w, h), IPL_DEPTH_8U, 4);
 	else
 		pCapImage = cvCreateImage(cvSize(w, h), IPL_DEPTH_8U, 1);
-	
+
 	// Set some camera parameters
 	//CLEyeSetCameraParameter(_cam, CLEYE_GAIN, 20);
 	//CLEyeSetCameraParameter(_cam, CLEYE_EXPOSURE, 511);
 	CLEyeSetCameraParameter(_cam, CLEYE_AUTO_GAIN, true);
 	CLEyeSetCameraParameter(_cam, CLEYE_AUTO_EXPOSURE, true);
 	CLEyeSetCameraParameter( _cam, CLEYE_HFLIP, true);
-	
+
 	// Start capturing
 	CLEyeCameraStart(_cam);
 	cvGetImageRawData(pCapImage, &pCapBuffer);
@@ -71,26 +71,34 @@ void CLEyeCameraCapture::Run()
 	double fps = 0;
 	// image capturing loop
 	Mat src_gray, subImage, subImage_gray;
-	
+
 	vector<Vec3f> circles;
 	Point center;
 	Point n_center;
 	int radius = 0;
 	int counter = 0;
 
+	char* fpsText = new char[5];
+	char* pos_text = new char[10];
+
 	while(_running)
 	{
 		CLEyeCameraGetFrame(_cam, pCapBuffer);
 		//check fps every 100 frames
 		frames++;
-		
+
 		if((frames % 100) == 0){
 			prevCount = count;
 			count = GetTickCount();
 			fps = 100000.0/(count - prevCount);
-			std::cout << "fps: " << fps << endl;
+			//std::cout << "fps: " << fps << endl;
+			sprintf(fpsText, "fps: %f", fps);
 		}
-	
+		if(frames > 100)
+			putText(pCapture, fpsText, Point(5, 20), CV_FONT_HERSHEY_PLAIN, 1, Scalar(250, 0, 0));
+		else
+			putText(pCapture, "calculating fps...", Point(5, 20), CV_FONT_HERSHEY_PLAIN, 1, Scalar(250, 0, 0));
+
 		//find circle in whole area of frame first
 		if(!_isTracking){
 			CircleDetector(pCapture, src_gray, circles, center, radius);
@@ -116,7 +124,7 @@ void CLEyeCameraCapture::Run()
 					counter = 0;
 					cout << "Lost tracking! Search whole frame." << endl;
 				}
-				
+
 			}
 			else
 			{
@@ -125,9 +133,14 @@ void CLEyeCameraCapture::Run()
 				n_center.y = temp.y - subImage_size + center.y;
 			}
 		}
+
+		sprintf(pos_text, "x=%d,y=%d", n_center.x, n_center.y);
+		if(circles.size() != 0){
+			putText(pCapture, pos_text, Point(n_center.x + radius, n_center.y - radius), CV_FONT_HERSHEY_PLAIN, 1, Scalar(250, 0, 0));
+		}
 		imshow(_windowName, pCapture);
 	}
-	
+
 	// Stop camera capture
 	CLEyeCameraStop(_cam);
 	// Destroy camera object
@@ -139,16 +152,18 @@ void CLEyeCameraCapture::Run()
 
 void CLEyeCameraCapture::CircleDetector(Mat& input, Mat& input_gray, vector<Vec3f>& circles, Point& center, int& radius)
 {
-	cvtColor(input, input_gray, CV_BGR2GRAY);
-	GaussianBlur(input_gray, input_gray, Size(3, 3), 2, 2);
-	HoughCircles(input_gray, circles, CV_HOUGH_GRADIENT, 2, input_gray.rows, 130, 50, 5, 20);
-	for(size_t i = 0; i < circles.size(); i++)
-	{
-		center.x = cvRound(circles[i][0]);
-		center.y = cvRound(circles[i][1]);
-		radius = cvRound(circles[i][2]);
-		circle(input, center, 3, Scalar(0, 255, 0), -1, 8, 0);
-		circle(input, center, radius, Scalar(0, 0, 255), 3, 8, 0);
+	if(input.data != NULL){
+		cvtColor(input, input_gray, CV_BGR2GRAY);
+		GaussianBlur(input_gray, input_gray, Size(3, 3), 2, 2);
+		HoughCircles(input_gray, circles, CV_HOUGH_GRADIENT, 2, input_gray.rows, 130, 50, 5, 20);
+		for(size_t i = 0; i < circles.size(); i++)
+		{
+			center.x = cvRound(circles[i][0]);
+			center.y = cvRound(circles[i][1]);
+			radius = cvRound(circles[i][2]);
+			circle(input, center, 3, Scalar(0, 255, 0), -1, 8, 0);
+			circle(input, center, radius, Scalar(0, 0, 255), 3, 8, 0);
+		}
 	}
 }
 
