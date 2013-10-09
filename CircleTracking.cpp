@@ -95,9 +95,9 @@ void CLEyeCameraCapture::Run()
 			sprintf(fpsText, "fps: %f", fps);
 		}
 		if(frames > 100)
-			putText(pCapture, fpsText, Point(5, 20), CV_FONT_HERSHEY_PLAIN, 1, Scalar(250, 0, 0));
+			putText(pCapture, fpsText, Point(5, 20), CV_FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 		else
-			putText(pCapture, "calculating fps...", Point(5, 20), CV_FONT_HERSHEY_PLAIN, 1, Scalar(250, 0, 0));
+			putText(pCapture, "calculating fps...", Point(5, 20), CV_FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 
 		//find circle in whole area of frame first
 		if(!_isTracking){
@@ -131,12 +131,13 @@ void CLEyeCameraCapture::Run()
 				counter = 0;
 				n_center.x = temp.x - subImage_size + center.x;
 				n_center.y = temp.y - subImage_size + center.y;
+				cout << "fps: " << fps << "  x:" << n_center.x << ", y:" << n_center.y << endl;
 			}
 		}
 
 		sprintf(pos_text, "x=%d,y=%d", n_center.x, n_center.y);
 		if(circles.size() != 0){
-			putText(pCapture, pos_text, Point(n_center.x + radius, n_center.y - radius), CV_FONT_HERSHEY_PLAIN, 1, Scalar(250, 0, 0));
+			putText(pCapture, pos_text, Point(n_center.x + radius, n_center.y - radius), CV_FONT_HERSHEY_PLAIN, 1, Scalar(0, 255, 0));
 		}
 		imshow(_windowName, pCapture);
 	}
