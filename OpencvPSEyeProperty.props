@@ -9,7 +9,7 @@
     <IncludePath>C:\opencv\build\include;C:\opencv\include;C:\Program Files (x86)\Code Laboratories\CL-Eye Platform SDK\Include;C:\Program Files (x86)\Code Laboratories\CL-Eye Platform SDK\Include\opencv2;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup>
-    <LibraryPath>C:\opencv\build\x86\vc10\lib;C:\opencv\build\x86\vc10\staticlib;C:\Program Files (x86)\Code Laboratories\CL-Eye Platform SDK\Lib;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\Program Files (x86)\Code Laboratories\CL-Eye Platform SDK\Lib;C:\opencv\build\x86\vc10\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <Link>
